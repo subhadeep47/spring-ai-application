@@ -12,6 +12,9 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Synchronous lock to prevent double submissions instantly
+  const isSendingRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -25,8 +28,11 @@ export default function App() {
   const handleSendMessage = async (e: React.SyntheticEvent) => {
     const controller = new AbortController();
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
 
+    // Instant synchronous check using ref
+    if (!input.trim() || isSendingRef.current) return;
+
+    isSendingRef.current = true;
     const userMessageText = input.trim();
     setInput('');
 
@@ -56,42 +62,39 @@ export default function App() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-
-      // Fixed: Generate a steady ID for the upcoming AI response block
       const aiMessageId = Date.now() + 1;
+
+      let buffer = "";
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
 
-        // Split chunks by newline
-        const lines = chunk.split("\n");
+        // Keep the last partial line in the buffer if the chunk ended mid-line
+        buffer = lines.pop() || "";
 
         for (let line of lines) {
-          if (!line.trim()) continue;
+          line = line.replace(/\r$/, "");
 
-          // Clean Spring's standard SSE prefix if present
           if (line.startsWith("data:")) {
-            line = line.replace("data:", "");
+            line = line.substring(5);
           }
 
-          const cleanToken = line.trim();
-          if (!cleanToken) continue;
+          const token = line;
+          if (!token && !buffer) continue;
 
-          // Purely functional approach resolves async closure limitations
           setMessages((prev) => {
             const hasBubble = prev.some(msg => msg.id === aiMessageId);
             scrollToBottom();
 
             if (!hasBubble) {
-              // Create the initial bubble frame
-              return [...prev, { id: aiMessageId, text: cleanToken, isUser: false }];
+              return [...prev, { id: aiMessageId, text: token, isUser: false }];
             } else {
-              // Safely look up and append characters directly onto the existing text frame
               return prev.map((msg) =>
-                msg.id === aiMessageId ? { ...msg, text: msg.text + " " + cleanToken } : msg
+                msg.id === aiMessageId ? { ...msg, text: msg.text + token } : msg
               );
             }
           });
@@ -104,6 +107,7 @@ export default function App() {
         { id: Date.now() + 2, text: "⚠️ Error: Unable to connect to the customer service assistant.", isUser: false }
       ]);
     } finally {
+      isSendingRef.current = false; // Release the lock
       setIsLoading(false);
     }
   };
@@ -134,7 +138,7 @@ export default function App() {
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${msg.isUser
+              className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm break-words overflow-hidden ${msg.isUser
                 ? 'bg-blue-600 text-white rounded-br-none'
                 : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'
                 }`}
@@ -175,7 +179,7 @@ export default function App() {
             disabled={!input.trim() || isLoading}
             className="bg-blue-600 text-white rounded-full p-3 font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-300 disabled:cursor-not-allowed shadow transition-colors"
           >
-            <svg xmlns="http://w3.org" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
             </svg>
           </button>
