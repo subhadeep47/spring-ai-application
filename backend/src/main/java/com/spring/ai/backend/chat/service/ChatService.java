@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ChatService {
@@ -26,29 +28,35 @@ public class ChatService {
             - Keep responses concise, helpful, and strictly relevant to the user's practical tasks.
             """;
 
-    private List<Message> history;
+    private static Map<String, List<Message>> history;
 
     private final ChatClient chatClient;
 
     public ChatService(ChatClient.Builder builder) {
         this.chatClient = builder.build();
-        history = new ArrayList<>();
+        history = new HashMap<>();
     }
 
-    public Flux<String> chat(String query) {
+    public Flux<String> chat(String query, String id) {
 
-        history.add(new UserMessage(query));
+        List<Message> sessionHistory = history.getOrDefault(id, new ArrayList<>());
+
+        sessionHistory.add(new UserMessage(query));
 
         StringBuilder assistantMessage = new StringBuilder();
 
         Flux<String> response = chatClient
                 .prompt()
                 .system(SYSTEM_PROMPT)
-                .messages(history)
+                .messages(sessionHistory)
                 .stream()
                 .content()
                 .doOnNext(assistantMessage::append)
-                .doOnComplete(() -> history.add(new AssistantMessage(assistantMessage.toString())));
+                .doOnComplete(() -> {
+                    sessionHistory.add(new AssistantMessage(assistantMessage.toString()));
+                    history.put(id, sessionHistory);
+                });
+
         return response;
     }
 }

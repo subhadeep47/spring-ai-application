@@ -6,7 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+import java.util.UUID;
+
+@CrossOrigin(origins = "http://localhost:5173", exposedHeaders = "X-Chat-Session-ID")
 @RestController
 @RequestMapping("/api")
 public class ChatController {
@@ -18,8 +20,14 @@ public class ChatController {
     }
 
     @PostMapping(path = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<Flux<String>> chat(@RequestBody String query) {
-        Flux<String> response = chatService.chat(query);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Flux<String>> chat(@RequestBody String query, @RequestHeader("X-Chat-Session-ID") String id) {
+
+        String chatId = !id.isEmpty() ? id : UUID.randomUUID().toString();
+
+        Flux<String> aiResponse = chatService.chat(query, chatId);
+
+        return ResponseEntity.ok()
+                .header("X-Chat-Session-ID", chatId)
+                .body(aiResponse);
     }
 }

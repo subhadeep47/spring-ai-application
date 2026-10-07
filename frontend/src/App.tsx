@@ -12,6 +12,7 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const chatSessionIdRef = useRef<string | null>(null);
 
   // Synchronous lock to prevent double submissions instantly
   const isSendingRef = useRef(false);
@@ -47,6 +48,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          "X-Chat-Session-ID": chatSessionIdRef.current ?? ''
         },
         body: JSON.stringify({ query: userMessageText }),
         signal: controller.signal,
@@ -55,6 +57,8 @@ export default function App() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      chatSessionIdRef.current = response.headers.get("X-Chat-Session-ID");
 
       if (!response.body) {
         throw new Error("Response body is null.");
