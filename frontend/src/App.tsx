@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: number;
@@ -147,9 +148,7 @@ export default function App() {
                 : 'bg-white text-slate-800 rounded-bl-none border border-slate-100'
                 }`}
             >
-              <p className="whitespace-pre-wrap leading-relaxed text-sm md:text-base">
-                {msg.text}
-              </p>
+              <ReactMarkdown>{msg.text}</ReactMarkdown>
             </div>
           </div>
         ))}
